@@ -15,97 +15,76 @@
 #include "timer_handler.h"
 
 event_dispatcher::event_dispatcher()
-  : init_ok_(false),
-		epoll_fd_(-1),
-    max_events_(256),
+  : epoll_fd_(-1),
+    event_capacity_(256),
     events_(NULL),
-    max_handlers_(1024),
+    handler_capacity_(1024),
     io_handlers_(NULL),
 		timer_heap_(NULL)
 { 
 }
 event_dispatcher::~event_dispatcher()
 {
-	this->clear();
+	if (this->epoll_fd_ != -1)
+		socket_utils::close(this->epoll_fd_);
+	if (this->events_)
+		delete []this->events_;
+	if (this->io_handlers_)
+		delete []this->io_handlers_;
+	if (this->timer_heap_)
+		delete this->timer_heap_;
 }
 
 int event_dispatcher::init()
 {
-	if (!this->init_ok_)
-	{
-		time_cache::instance()->update();
-		do 
-		{
-			if ((this->epoll_fd_ = ::epoll_create(32000)) == -1) 
-				break;
-
-			if (!(this->events_ = new epoll_event[this->max_events_]))
-				break;
-			::memset(this->events_, 0, sizeof(epoll_event) * this->max_events_);
-
-			if (!(this->io_handlers_ = new io_handler*[this->max_handlers_]))
-				break;
-			::memset(this->io_handlers_, 0, sizeof(void*) * this->max_handlers_);
-
-			if (!(this->timer_heap_ = new timer_min_heap))
-				break;
-
-			this->init_ok_ = true;
-
-		} while (0);
-
-		if (!this->init_ok_)
-			this->clear();
-	}
-
-  return this->init_ok_ ? 0 : -1;
-}
-void event_dispatcher::clear()
-{
-	if (this->epoll_fd_ != -1)
-	{
-		socket_utils::close(this->epoll_fd_);
-		this->epoll_fd_ = -1;
-	}
-	if (this->events_)
-	{
-		delete []this->events_;
-		this->events_ = NULL;
-	}
-	if (this->io_handlers_)
-	{
-		delete []this->io_handlers_;
-		this->io_handlers_ = NULL;
-	}
-	if (this->timer_heap_)
-	{
-		delete this->timer_heap_;
-		this->timer_heap_ = NULL;
-	}
-
-	this->init_ok_ = false;
-	this->max_events_ = 256;
-	this->max_handlers_ = 1024;
-}
-int event_dispatcher::grow_up_io_handlers()
-{
-	int new_max_handlers = this->max_handlers_ * 2;
-	io_handler **new_io_handlers = new io_handler*[new_max_handlers];
-	if (!new_io_handlers)
+	if ((this->epoll_fd_ = ::epoll_create(32000)) == -1) 
 		return -1;
 
-	::memset(new_io_handlers, 0, sizeof(void*) * new_max_handlers);
-	::memcpy(new_io_handlers, this->io_handlers_, sizeof(void*) * this->max_handlers_);
-	delete []this->io_handlers_;
-	this->io_handlers_ = new_io_handlers;
-	this->max_handlers_ = new_max_handlers;
+	if (!(this->events_ = new epoll_event[this->event_capacity_])) {
+		socket_utils::close(this->epoll_fd_);
+		this->epoll_fd_ = -1;
+		return -1;
+	}
+	::memset(this->events_, 0, sizeof(epoll_event) * this->event_capacity_);
+
+	if (!(this->io_handlers_ = new io_handler*[this->handler_capacity_])) {
+		socket_utils::close(this->epoll_fd_);
+		this->epoll_fd_ = -1;
+		delete []this->events_;
+		return -1;
+	}
+	::memset(this->io_handlers_, 0, sizeof(void*) * this->handler_capacity_);
+
+	if (!(this->timer_heap_ = new timer_min_heap)) {
+		socket_utils::close(this->epoll_fd_);
+		this->epoll_fd_ = -1;
+		delete []this->events_;
+		delete []this->io_handlers_;
+		return -1;
+	}
+
+	time_cache::instance()->update();
 	return 0;
 }
-int event_dispatcher::add_event(int fd, io_handler *handler, int had_ev, int add_ev)
+int event_dispatcher::add_event(int fd, 
+																io_handler *handler, 
+																int had_ev, 
+																int add_ev)
 {
-	while (fd >= this->max_handlers_)
-		if (this->grow_up_io_handlers() != 0)
+	while (fd >= this->handler_capacity_) {
+		int new_capacity = this->handler_capacity_ * 2;
+		io_handler **new_io_handlers = new io_handler*[new_capacity];
+		if (!new_io_handlers)
 			return -1;
+
+		::memset(new_io_handlers, 0, sizeof(void*) * new_capacity);
+		::memcpy(new_io_handlers, 
+						this->io_handlers_, 
+						sizeof(void*) * this->handler_capacity_);
+		delete []this->io_handlers_;
+		this->io_handlers_ = new_io_handlers;
+		this->handler_capacity_ = new_capacity;
+	}
 
 	int op = (had_ev == 0) ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 	epoll_event ee;
@@ -117,7 +96,10 @@ int event_dispatcher::add_event(int fd, io_handler *handler, int had_ev, int add
 		this->io_handlers_[fd] = handler;
 	return ret;
 }
-int event_dispatcher::del_event(int fd, io_handler *handler, int had_ev, int del_ev)
+int event_dispatcher::del_event(int fd,
+																io_handler *handler,
+															 	int had_ev, 
+																int del_ev)
 {
 	if (!(had_ev & del_ev))
 		return 0;
@@ -141,10 +123,14 @@ void event_dispatcher::run()
     do
     {
 			time_cache::instance()->update();
-			int ms = this->timer_heap_->nearest_timeout(time_cache::instance()->cur_ms());
+			int64_t now_ms = time_cache::instance()->cur_ms();
+			int ms = this->timer_heap_->nearest_timeout(now_ms);
 			if (ms > 30 * 60 * 1000) // time too long ,kernerl befor 2.6.24 bug
 				ms = 30 * 60 * 1000; // 30 minutes
-      nfds = ::epoll_wait(this->epoll_fd_, this->events_, this->max_events_, ms);
+      nfds = ::epoll_wait(this->epoll_fd_, 
+													this->events_,
+												 	this->event_capacity_,
+												 	ms);
     } while (nfds == -1 && errno == EINTR);
 
 		time_cache::instance()->update();
@@ -159,7 +145,7 @@ void event_dispatcher::process_io_event(int nfds)
 		int fd = this->events_[i].data.fd;
 		int what = this->events_[i].events;
 		io_handler *handler = this->io_handlers_[fd];
-		if (!handler) // what happend
+		if (!handler) // what happend ???
 			continue;
 		int ret = 0;
 		if (what & (EPOLLIN | EPOLLHUP | EPOLLERR))
@@ -167,11 +153,8 @@ void event_dispatcher::process_io_event(int nfds)
 		if (ret == 0 && (what & EPOLLOUT))
 			ret = handler->handle_output();
 
-		if (ret != 0) //error
-		{
-			handler->on_disconnected();
-			socket_utils::close(fd);
-		}
+		if (ret != 0)
+			handler->disconnected();
 	}
 }
 void event_dispatcher::process_timeout(int64_t cur_ms)
