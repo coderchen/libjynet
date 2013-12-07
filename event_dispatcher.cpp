@@ -143,10 +143,19 @@ void event_dispatcher::run()
 		int nfds = 0;
 		do {
 			time_cache::instance()->update();
-			int64_t now_ms = time_cache::instance()->cur_ms();
-			int ms = this->timer_heap_->nearest_timeout(now_ms);
-			if (ms > 30 * 60 * 1000) // time too long ,kernerl befor 2.6.24 bug
-				ms = 30 * 60 * 1000; // 30 minutes
+			int ms = -1;
+			if (this->timer_heap_->size() > 0) {
+				int64_t now_ms = time_cache::instance()->cur_ms();
+				int64_t deadline_ms = this->timer_heap_->nearest_timeout();
+				ms = deadline_ms - now_ms;
+				if (ms < 0) {
+					//log
+					ms = 5;
+				} else if (ms > 30 * 60 * 1000) { // time too long
+					ms = 30 * 60 * 1000;
+				}
+			}
+			
 			nfds = ::epoll_wait(this->epoll_fd_, this->events_, this->event_capacity_, ms);
 		} while (nfds == -1 && errno == EINTR);
 

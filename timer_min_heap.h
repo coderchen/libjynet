@@ -20,7 +20,8 @@ class timer_min_heap
 	public:
 		timer_handler* check_timeout(int64_t now_ms);
 		int schedule_timer(int64_t dead_line, timer_handler *handler);
-		int nearest_timeout(int64_t now_ms);
+		int64_t nearest_timeout() const;
+		int size() const { return this->size_; }
 
 	private:
 		void adjust_down(int slot);

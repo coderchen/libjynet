@@ -14,19 +14,16 @@ timer_min_heap::~timer_min_heap()
 		delete []this->timers_;
 }
 
-int timer_min_heap::nearest_timeout(int64_t now_ms)
+int64_t timer_min_heap::nearest_timeout() const
 {
-	int ms = -1;
-	if (this->size_ > 0) {
-		ms = this->timers_[0].dead_line_ - now_ms;
-		if (ms <= 0) { // sorry, may be dealyed
-			// log
-			ms = 5;
-		}
-	}
-	return ms;
+	int64_t timeout = -1;
+	if (this->size_ > 0)
+		timeout = this->timers_[0].dead_line_;
+	return timeout;
 }
-int timer_min_heap::schedule_timer(int64_t dead_line, timer_handler *handler)
+int timer_min_heap::schedule_timer(
+		int64_t dead_line, 
+		timer_handler *handler)
 {
 	while (this->size_ >= this->capacity_) {
 		int new_capacity = this->capacity_ ? this->capacity_ * 2 : 256;
