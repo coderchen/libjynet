@@ -66,7 +66,8 @@ int event_dispatcher::init()
 	time_cache::instance()->update();
 	return 0;
 }
-int event_dispatcher::add_ev_mask(io_handler *handler, 
+int event_dispatcher::add_ev_mask(
+		io_handler *handler, 
 		int had_ev_mask, 
 		int add_ev_mask)
 {
@@ -108,9 +109,10 @@ int event_dispatcher::add_ev_mask(io_handler *handler,
 		this->io_handlers_[fd] = handler;
 	return ret;
 }
-int event_dispatcher::del_ev_mask(io_handler *handler,
-																	int had_ev_mask, 
-																	int del_ev_mask)
+int event_dispatcher::del_ev_mask(
+		io_handler *handler,
+		int had_ev_mask, 
+		int del_ev_mask)
 {
 	if (!handler) {
 		//log
@@ -137,8 +139,8 @@ int event_dispatcher::del_ev_mask(io_handler *handler,
 }
 void event_dispatcher::run()
 {
-  while (1) {
-    int nfds = 0;
+	while (1) {
+		int nfds = 0;
 		do {
 			time_cache::instance()->update();
 			int64_t now_ms = time_cache::instance()->cur_ms();
