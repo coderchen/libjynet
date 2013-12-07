@@ -92,7 +92,7 @@ int event_dispatcher::add_ev_mask(io_handler *handler,
 
 	int had_epoll_ev = handler->ev_mask_2_epoll_ev(had_ev_mask);
 	int add_epoll_ev = handler->ev_mask_2_epoll_ev(add_ev_mask);
-	int new_epoll_ev = had_epoll_ev & add_epoll_ev;
+	int new_epoll_ev = had_epoll_ev | add_epoll_ev;
 	if (new_epoll_ev == 0) {
 		//log
 		return -1;

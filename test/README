@@ -1,1 +1,5 @@
 first, make sure `libjynet.a` was installed.
+
+webserver test:
+	1: ./webserver &
+	2: ab -n 100000 -c 1000 http://127.0.0.1:5757/
