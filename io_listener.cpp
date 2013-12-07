@@ -36,7 +36,7 @@ int io_listener::listen(int port)
 		return -1;
 	}
 
-	if (this->add_event(EPOLLIN | EPOLLET) == -1) {
+	if (this->add_ev_mask(io_handler::EV_READ_MASK) == -1) {
 		socket_utils::close(this->sock_fd_);
 		this->sock_fd_ = -1;
 		return -1;
@@ -46,16 +46,19 @@ int io_listener::listen(int port)
 }
 int io_listener::handle_input()
 {
-	while (1)
-	{
+	while (1) {
 		int conn_fd = socket_utils::accept(this->sock_fd_);
-		if (conn_fd == -1)
+		if (conn_fd == -1) {
+			if (errno != EAGAIN) {
+				// log
+			}
 			break;
+		}
 
 		io_handler *handler = this->new_connection(this->dispatcher_,
 																							 conn_fd);
 		if (handler)
-		 	handler->connected();
+		 	handler->on_connected();
 	}
 
 	return 0;

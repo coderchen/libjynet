@@ -6,43 +6,41 @@
 #include "socket_utils.h"
 
 io_handler::io_handler(event_dispatcher *dispatcher, int fd) 
-  : sock_fd_(fd), had_ev_(0), dispatcher_(dispatcher)
+  : sock_fd_(fd), 
+	had_ev_mask_(io_handler::EV_NONE_MASK), 
+	dispatcher_(dispatcher)
 {
 }
 io_handler::~io_handler()
 {
 }
 
-int io_handler::add_event(int ev)
+int io_handler::add_ev_mask(int ev_mask)
 {
-	int ret = this->dispatcher_->add_event(this->sock_fd_, 
-																				 this, 
-																				 this->had_ev_, 
-																				 ev);
+	int ret = this->dispatcher_->add_ev_mask(this, 
+																					 this->had_ev_mask_, 
+																					 ev_mask);
 	if (ret == 0)
-		this->had_ev_ |= ev;
+		this->had_ev_mask_ |= ev_mask;
 	return ret;
 }
-int io_handler::del_event(int ev)
+int io_handler::del_ev_mask(int ev_mask)
 {
-	int ret = this->dispatcher_->del_event(this->sock_fd_, 
-																				 this,
-																				 this->had_ev_, 
-																				 ev);
+	int ret = this->dispatcher_->del_ev_mask(this,
+																				   this->had_ev_mask_, 
+																				   ev_mask);
 	if (ret == 0)
-		this->had_ev_ &= ~ev;
+		this->had_ev_mask_ &= ~ev_mask;
 	return ret;
 }
-int io_handler::connected()
+int io_handler::ev_mask_2_epoll_ev(int ev_mask) const
 {
-	socket_utils::set_nonblock(this->sock_fd_);
-	this->add_event(EPOLLIN | EPOLLOUT | EPOLLET);
-	return this->on_connected();
-}
-int io_handler::disconnected()
-{
-	socket_utils::close(this->sock_fd_);
-	this->sock_fd_ = -1;
-	this->del_event(this->had_ev_);
-	return this->on_disconnected();
+	int epoll_ev = 0;
+
+	if (ev_mask & io_handler::EV_READ_MASK)
+		epoll_ev |= EPOLLIN;
+	if (ev_mask & io_handler::EV_WRITE_MASK)
+		epoll_ev |= EPOLLOUT;
+
+	return epoll_ev;
 }

@@ -18,8 +18,8 @@ public:
   int init();
   void run();
 
-	int add_event(int fd, io_handler *handler, int had_ev, int add_ev);
-	int del_event(int fd, io_handler *handler, int had_ev, int del_ev);
+	int add_ev_mask(io_handler *handler, int had_ev_mask, int add_ev_mask);
+	int del_ev_mask(io_handler *handler, int had_ev_mask, int del_ev_mask);
 	int schedule_timer(timer_handler *handler, int ms);
 
 private:

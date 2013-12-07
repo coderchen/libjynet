@@ -45,7 +45,6 @@ int event_dispatcher::init()
 		this->epoll_fd_ = -1;
 		return -1;
 	}
-	::memset(this->events_, 0, sizeof(epoll_event) * this->event_capacity_);
 
 	if (!(this->io_handlers_ = new io_handler*[this->handler_capacity_])) {
 		socket_utils::close(this->epoll_fd_);
@@ -53,7 +52,8 @@ int event_dispatcher::init()
 		delete []this->events_;
 		return -1;
 	}
-	::memset(this->io_handlers_, 0, sizeof(void*) * this->handler_capacity_);
+	for (int i = 0; i < this->handler_capacity_; ++i)
+		this->io_handlers_[i] = NULL;
 
 	if (!(this->timer_heap_ = new timer_min_heap)) {
 		socket_utils::close(this->epoll_fd_);
@@ -66,62 +66,81 @@ int event_dispatcher::init()
 	time_cache::instance()->update();
 	return 0;
 }
-int event_dispatcher::add_event(int fd, 
-																io_handler *handler, 
-																int had_ev, 
-																int add_ev)
+int event_dispatcher::add_ev_mask(io_handler *handler, 
+																	int had_ev_mask, 
+																	int add_ev_mask)
 {
+	if (!handler) {
+		//log
+		return -1;
+	}
+	int fd = handler->get_sock_fd();
 	while (fd >= this->handler_capacity_) {
 		int new_capacity = this->handler_capacity_ * 2;
 		io_handler **new_io_handlers = new io_handler*[new_capacity];
 		if (!new_io_handlers)
 			return -1;
 
-		::memset(new_io_handlers, 0, sizeof(void*) * new_capacity);
 		::memcpy(new_io_handlers, 
 						this->io_handlers_, 
-						sizeof(void*) * this->handler_capacity_);
+						sizeof(io_handler*) * this->handler_capacity_);
+		for (int i = this->handler_capacity_; i < new_capacity; ++i)
+			new_io_handlers[i] = NULL;
 		delete []this->io_handlers_;
 		this->io_handlers_ = new_io_handlers;
 		this->handler_capacity_ = new_capacity;
 	}
 
-	int op = (had_ev == 0) ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+	int had_epoll_ev = handler->ev_mask_2_epoll_ev(had_ev_mask);
+	int add_epoll_ev = handler->ev_mask_2_epoll_ev(add_ev_mask);
+	int new_epoll_ev = had_epoll_ev & add_epoll_ev;
+	if (new_epoll_ev == 0) {
+		//log
+		return -1;
+	}
+
+	int op = (had_epoll_ev == 0) ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 	epoll_event ee;
 	::memset(&ee, 0, sizeof(ee));
-	ee.events = had_ev | add_ev;
+	ee.events = new_epoll_ev;
 	ee.data.fd = fd;
 	int ret = ::epoll_ctl(this->epoll_fd_, op, fd, &ee);
 	if (ret == 0)
 		this->io_handlers_[fd] = handler;
 	return ret;
 }
-int event_dispatcher::del_event(int fd,
-																io_handler *handler,
-															 	int had_ev, 
-																int del_ev)
+int event_dispatcher::del_ev_mask(io_handler *handler,
+																	int had_ev_mask, 
+																	int del_ev_mask)
 {
-	if (!(had_ev & del_ev))
-		return 0;
+	if (!handler) {
+		//log
+		return -1;
+	}
+	int had_epoll_ev = handler->ev_mask_2_epoll_ev(had_ev_mask);
+	int del_epoll_ev = handler->ev_mask_2_epoll_ev(del_ev_mask);
+	if ((had_epoll_ev & del_epoll_ev) == 0) {
+		//log
+		return -1;
+	}
+	int new_epoll_ev = had_epoll_ev & (~del_epoll_ev);
 
-	had_ev &= ~del_ev;
-	int op = (had_ev == 0) ? EPOLL_CTL_DEL : EPOLL_CTL_MOD;
+	int op = (new_epoll_ev == 0) ? EPOLL_CTL_DEL : EPOLL_CTL_MOD;
+	int fd = handler->get_sock_fd();
 	epoll_event ee;
 	::memset(&ee, 0, sizeof(ee));
-	ee.events = had_ev;
+	ee.events = new_epoll_ev;
 	ee.data.fd = fd;
 	int ret = ::epoll_ctl(this->epoll_fd_, op, fd, &ee); 
-	if (ret == 0 && had_ev == 0)
+	if (ret == 0 && new_epoll_ev == 0)
 		this->io_handlers_[fd] = NULL;
 	return ret;
 }
 void event_dispatcher::run()
 {
-  while (1)
-  {
+  while (1) {
     int nfds = 0;
-    do
-    {
+    do {
 			time_cache::instance()->update();
 			int64_t now_ms = time_cache::instance()->cur_ms();
 			int ms = this->timer_heap_->nearest_timeout(now_ms);
@@ -140,13 +159,14 @@ void event_dispatcher::run()
 }
 void event_dispatcher::process_io_event(int nfds)
 {
-	for (int i = 0; i < nfds; ++i)
-	{
+	for (int i = 0; i < nfds; ++i) {
 		int fd = this->events_[i].data.fd;
 		int what = this->events_[i].events;
 		io_handler *handler = this->io_handlers_[fd];
-		if (!handler) // what happend ???
+		if (!handler) { // what happend ???
+			// log
 			continue;
+		}
 		int ret = 0;
 		if (what & (EPOLLIN | EPOLLHUP | EPOLLERR))
 			ret = handler->handle_input();
@@ -154,7 +174,7 @@ void event_dispatcher::process_io_event(int nfds)
 			ret = handler->handle_output();
 
 		if (ret != 0)
-			handler->disconnected();
+			handler->on_disconnected();
 	}
 }
 void event_dispatcher::process_timeout(int64_t cur_ms)
