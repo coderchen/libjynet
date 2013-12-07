@@ -17,18 +17,14 @@ io_handler::~io_handler()
 
 int io_handler::add_ev_mask(int ev_mask)
 {
-	int ret = this->dispatcher_->add_ev_mask(this, 
-																					 this->had_ev_mask_, 
-																					 ev_mask);
+	int ret = this->dispatcher_->add_ev_mask(this, this->had_ev_mask_, ev_mask);
 	if (ret == 0)
 		this->had_ev_mask_ |= ev_mask;
 	return ret;
 }
 int io_handler::del_ev_mask(int ev_mask)
 {
-	int ret = this->dispatcher_->del_ev_mask(this,
-																				   this->had_ev_mask_, 
-																				   ev_mask);
+	int ret = this->dispatcher_->del_ev_mask(this, this->had_ev_mask_, ev_mask);
 	if (ret == 0)
 		this->had_ev_mask_ &= ~ev_mask;
 	return ret;

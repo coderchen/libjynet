@@ -81,9 +81,8 @@ int event_dispatcher::add_ev_mask(io_handler *handler,
 		if (!new_io_handlers)
 			return -1;
 
-		::memcpy(new_io_handlers, 
-						this->io_handlers_, 
-						sizeof(io_handler*) * this->handler_capacity_);
+		int mem_size = sizeof(void*) * this->handler_capacity_;
+		::memcpy(new_io_handlers, this->io_handlers_, mem_size);
 		for (int i = this->handler_capacity_; i < new_capacity; ++i)
 			new_io_handlers[i] = NULL;
 		delete []this->io_handlers_;
@@ -146,10 +145,7 @@ void event_dispatcher::run()
 			int ms = this->timer_heap_->nearest_timeout(now_ms);
 			if (ms > 30 * 60 * 1000) // time too long ,kernerl befor 2.6.24 bug
 				ms = 30 * 60 * 1000; // 30 minutes
-      nfds = ::epoll_wait(this->epoll_fd_, 
-													this->events_,
-												 	this->event_capacity_,
-												 	ms);
+      nfds = ::epoll_wait(this->epoll_fd_, this->events_, this->event_capacity_, ms);
     } while (nfds == -1 && errno == EINTR);
 
 		time_cache::instance()->update();

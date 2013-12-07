@@ -46,6 +46,7 @@ int io_listener::listen(int port)
 }
 int io_listener::handle_input()
 {
+	io_handler *handler = NULL;
 	while (1) {
 		int conn_fd = socket_utils::accept(this->sock_fd_);
 		if (conn_fd == -1) {
@@ -55,8 +56,7 @@ int io_listener::handle_input()
 			break;
 		}
 
-		io_handler *handler = this->new_connection(this->dispatcher_,
-																							 conn_fd);
+		handler = this->new_connection(this->dispatcher_, conn_fd);
 		if (handler)
 		 	handler->on_connected();
 	}

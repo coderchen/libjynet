@@ -14,38 +14,34 @@ timer_min_heap::~timer_min_heap()
 		delete []this->timers_;
 }
 
-int timer_min_heap::grow_up()
-{
-	int new_capacity = this->capacity_ ? this->capacity_ * 2 : 512;
-	timer_node *new_timers = new timer_node[new_capacity];
-	if (!new_timers)
-		return -1;
-
-	if (this->timers_)
-	{
-		::memcpy(new_timers, this->timers_, sizeof(timer_node) * this->capacity_);	
-		delete []this->timers_;
-	}
-	this->timers_ = new_timers;
-	this->capacity_ = new_capacity;
-	return 0;
-}
 int timer_min_heap::nearest_timeout(int64_t now_ms)
 {
 	int ms = -1;
-	if (this->size_ > 0)
-	{
+	if (this->size_ > 0) {
 		ms = this->timers_[0].dead_line_ - now_ms;
-		if (ms <= 0) // sorry, may be dealyed
+		if (ms <= 0) { // sorry, may be dealyed
+			// log
 			ms = 5;
+		}
 	}
 	return ms;
 }
 int timer_min_heap::schedule_timer(int64_t dead_line, timer_handler *handler)
 {
-	while (this->size_ >= this->capacity_)
-		if (this->grow_up() != 0)
+	while (this->size_ >= this->capacity_) {
+		int new_capacity = this->capacity_ ? this->capacity_ * 2 : 256;
+		timer_node *new_timers = new timer_node[new_capacity];
+		if (!new_timers)
 			return -1;
+
+		if (this->timers_) {
+			int mem_size = sizeof(timer_node) * this->size_;
+			::memcpy(new_timers, this->timers_, mem_size);	
+			delete []this->timers_;
+		}
+		this->timers_ = new_timers;
+		this->capacity_ = new_capacity;
+	}
 
 	this->timers_[this->size_].dead_line_ = dead_line;
 	this->timers_[this->size_].handler_ = handler;

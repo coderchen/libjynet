@@ -23,7 +23,6 @@ class timer_min_heap
 		int nearest_timeout(int64_t now_ms);
 
 	private:
-		int grow_up();
 		void adjust_down(int slot);
 		void adjust_up(int slot);
 
