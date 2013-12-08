@@ -40,3 +40,15 @@ int io_handler::ev_mask_2_epoll_ev(int ev_mask) const
 
 	return epoll_ev;
 }
+void io_handler::handle_connected()
+{
+	this->on_connected();
+}
+void io_handler::handle_disconnected()
+{
+	if (this->had_ev_mask_ != io_handler::EV_NONE_MASK)
+		this->del_ev_mask(this->had_ev_mask_);
+	socket_utils::close(this->sock_fd_);
+	this->sock_fd_ = -1;
+	this->on_disconnected();
+}

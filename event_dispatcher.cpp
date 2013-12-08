@@ -181,7 +181,7 @@ void event_dispatcher::process_io_event(int nfds)
 			ret = handler->handle_output();
 
 		if (ret != 0)
-			handler->on_disconnected();
+			handler->handle_disconnected();
 	}
 }
 void event_dispatcher::process_timeout(int64_t cur_ms)

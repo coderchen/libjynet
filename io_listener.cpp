@@ -58,7 +58,7 @@ int io_listener::handle_input()
 
 		handler = this->new_connection(this->dispatcher_, conn_fd);
 		if (handler)
-		 	handler->on_connected();
+		 	handler->handle_connected();
 	}
 
 	return 0;

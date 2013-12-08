@@ -26,15 +26,12 @@ class test_client : public io_handler
 			socket_utils::send(this->get_sock_fd(), buf, sizeof(buf) - 1);
 			return -1; // return -1, then will call on_disconnected
 		}
-		virtual int on_connected()
+		virtual void on_connected()
 		{
-			return this->add_ev_mask(io_handler::EV_READ_MASK);
+			this->add_ev_mask(io_handler::EV_READ_MASK);
 		}
-		virtual int on_disconnected()
+		virtual void on_disconnected()
 		{
-			this->del_ev_mask(this->had_ev_mask_);
-			socket_utils::close(this->get_sock_fd());
-			return 0;
 		}
 };
 class my_listener : public io_listener

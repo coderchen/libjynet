@@ -18,13 +18,15 @@ public:
 
   virtual int handle_input() = 0;
   virtual int handle_output() = 0;
-  virtual int on_connected() = 0;
-  virtual int on_disconnected() = 0; 
+	void handle_connected();
+	void handle_disconnected();
 
 	int get_sock_fd() const { return this->sock_fd_; }
 	int ev_mask_2_epoll_ev(int ev_mask) const;
 
 protected:
+  virtual void on_connected() = 0;
+  virtual void on_disconnected() = 0; 
 	int add_ev_mask(int ev_mask);
 	int del_ev_mask(int ev_mask);
 

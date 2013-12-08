@@ -14,8 +14,8 @@ class io_listener : public io_handler
 
 	protected:
 		virtual int handle_output()		{ return 0; }
-		virtual int on_connected()		{ return 0; }
-		virtual int on_disconnected() { return 0; }
+		virtual void on_connected()		{ }
+		virtual void on_disconnected() { }
 
 		virtual io_handler* new_connection(event_dispatcher *dispatcher, 
 																			 int conn_fd) = 0;
