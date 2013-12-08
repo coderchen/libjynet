@@ -4,6 +4,8 @@
 #include <jynet/event_dispatcher.h>
 #include <jynet/socket_utils.h>
 
+#include <signal.h>
+
 class test_client : public io_handler
 {
 	public:
@@ -49,6 +51,8 @@ class my_listener : public io_listener
 };
 int main()
 {
+	::signal(SIGPIPE, SIG_IGN);
+
 	event_dispatcher ed;
 	if (ed.init() != 0) {
 		std::cout << "init err." << std::endl;
